@@ -1,5 +1,8 @@
 Revision history for Perl extension Audio::Gramofile.
 
+0.05  Sat Jul  3 21:52:00 2004
+        - brought versions up to date
+
 0.02  Sat Oct 11 23:33:00 2003
         - added support for Sylvain Deschenes normalize filter
 

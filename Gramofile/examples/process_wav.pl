@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# $Id: process_wav.pl,v 1.5 2003/10/11 23:33:48 bob9960 Exp $
+# $Id: process_wav.pl,v 1.6 2004/05/17 22:21:39 bob9960 Exp $
 #
 
 =pod
@@ -27,7 +27,7 @@ some of the filters available from gramofile. These split and processed
 wav files are post-processed with sox, which adjusts the volume of the
 file to the maximum possible without clipping. The wav files are then
 converted to mp3 format by using lame, to ogg format by using oggenc, and
-to loss-less compressed wav format by flac.
+to lossless compressed wav format by flac.
 
 The raw wav files were recorded using the standard curses interface to 
 gramofile, or the Gnome Sound Recorder.
@@ -65,9 +65,15 @@ my $use_signproc=1;
 
 # the following determine what we will produce
 
+my $use_sox = 1;
 my $make_flac = 1;
 my $make_mp3 = 1;
 my $make_ogg = 1;
+
+my $infile_regexp = '\.wav$';
+my $outfile_prefix = "out";
+my $root_regexp = '^(.*)(?:(\d\d)?\.wav)$';
+my $track_regexp = '(\d\d)\.wav$';
 
 my $make_use_rms;
 my $make_graphs;
@@ -113,10 +119,6 @@ my $getopt_result = GetOptions (
   'min_track_blocks=i' => \$min_track_blocks,
   'extra_blocks_start=i' => \$extra_blocks_start,
   'extra_blocks_end=i' => \$extra_blocks_end,
-  'use_tracksplit=i' => \$use_tracksplit,
-  'use_signproc=i' => \$use_signproc,
-  'make_mp3=i' => \$make_mp3,
-  'make_ogg=i' => \$make_ogg,
   'filter=s@' => \@filter_list,
   'simple_median_num_samples=i' => \$simple_median_num_samples,
   'double_median_first_num_samples=i' => \$double_median_first_num_samples,
@@ -140,8 +142,24 @@ my $getopt_result = GetOptions (
   'cmf3_tick_detection_threshold=i' => \$cmf3_tick_detection_threshold,
   'cmf3_fft_length=i' => \$cmf3_fft_length,
   'simple_normalize_factor=i' => \$simple_normalize_factor,
+  'use_tracksplit=i' => \$use_tracksplit,
+  'use_signproc=i' => \$use_signproc,
+  'use_sox=i' => \$use_sox,
+  'make_flac=i' => \$make_flac,
+  'make_mp3=i' => \$make_mp3,
+  'make_ogg=i' => \$make_ogg,
+  'infile_regexp=s' => \$infile_regexp,
+  'outfile_prefix=s' => \$outfile_prefix,
+  'root_regexp=s' => \$root_regexp,
+  'track_regexp=s' => \$track_regexp,
 );
 die "Bad Parameter passed to $0" unless ($getopt_result);
+
+die "process_wav wav_dir output_dir [tmp_dir]" unless (($#ARGV == 1) or ($#ARGV == 2));
+
+my $wav_dir = shift @ARGV;
+my $output_dir = shift @ARGV;
+my $tmp_dir= @ARGV ? shift @ARGV : $wav_dir;
 
 my $silence_blocks=$min_silence_blocks;
 my $gramofile = Audio::Gramofile->new or die "Can't make a new Gramofile object, $!";
@@ -215,42 +233,29 @@ $gramofile->init_cmf3_filter("fft_length" => $cmf3_fft_length)
 
 $gramofile->init_simple_normalize_filter("normalize_factor" => $simple_normalize_factor) 
   if (defined $simple_normalize_factor);
-
-die "process_wav wav_dir output_dir [tmp_dir]" unless (($#ARGV == 1) or ($#ARGV == 2));
-
-my $wav_dir = shift @ARGV;
-my $output_dir = shift @ARGV;
-my $tmp_dir= @ARGV ? shift @ARGV : $wav_dir;
+$gramofile->init_filter_tracks(@filter_list);
 
 opendir(WAVDIR, $wav_dir) || die "can't opendir $wav_dir: $!";
 
-$gramofile->init_filter_tracks(@filter_list);
-# all of my input files matched this regexp 
-# i.e. they were called somethingnew.wav
-foreach my $file (grep { /new\.wav$/ } readdir(WAVDIR)) {
+foreach my $file (grep { /$infile_regexp/ } readdir(WAVDIR)) {
   $min_silence_blocks=$silence_blocks;
   print "WAV_DIR is $wav_dir, OUTPUT_DIR is $output_dir, TMP_DIR is $tmp_dir, FILE : $file\n";
   $gramofile->set_input_file($wav_dir . '/' . $file);
-  $gramofile->set_output_file($tmp_dir . '/' . "out" . $file);
+  $gramofile->set_output_file($tmp_dir . '/' . $outfile_prefix . $file);
   $gramofile->split_to_tracks if ($use_tracksplit);
   $gramofile->filter_tracks if ($use_signproc);
 
-# my input files ended with the string new.wav, so the gramofile
-# program splits them into somethingnew01.wav, somethingnew02.wav etc.
-
   opendir(TMPDIR, $tmp_dir) || die "can't opendir $tmp_dir: $!";
-  my ($root,$track) = $file =~ /^(.*)new((\d\d)?\.wav)$/;
-  foreach my $split_wav (grep { /^out$root/ } readdir (TMPDIR)) {
+  my ($root) = $file =~ /$root_regexp/;
+  foreach my $split_wav (grep { /^${outfile_prefix}$root/ } readdir (TMPDIR)) {
     print "split_wav is ",$split_wav,"\n";
-    my ($root,$track) = $split_wav =~ /^out(.*)new(?:(\d\d)?\.wav)$/;
+    my ($track) = $split_wav =~ /$track_regexp/;
     $track = "01" . $track unless ($track =~ /^\d\d/);
     my $in_file = $tmp_dir . '/' . $split_wav;
     my $out_file = $output_dir . "/" . $root . $track;
     print "INFILE : $in_file, OUTFILE : $out_file, ROOT : $root, STEM : $track\n";
-    my ($side) = $root =~ /(\w)_$/;
-    $side = uc $side;
 
-    encode_wav($in_file, $out_file, $track, $make_mp3, $make_ogg);
+    encode_wav($in_file, $out_file, $track, $use_sox, $make_flac, $make_mp3, $make_ogg);
     unlink $in_file or warn "Can't unlink $in_file, $!";
   }
   closedir TMPDIR;
@@ -258,18 +263,20 @@ foreach my $file (grep { /new\.wav$/ } readdir(WAVDIR)) {
 closedir WAVDIR;
 
 sub encode_wav {
-  my ($in_file, $out_file, $track, $make_mp3, $make_ogg) = @_;
+  my ($in_file, $out_file, $track, $use_sox, $make_flac, $make_mp3, $make_ogg) = @_;
   print "in_file is $in_file, out_file is $out_file\n";
   print "track is $track\n" if (defined $track);
   my ($tmp_fh, $tmp_file) = mkstemps("/tmp/temp.XXXX", '.wav');
 
-  eval { 
-    my $soxval = `sox $in_file -e stat -v 2>&1`;
-    chomp($soxval);
-    print "SOXVAL is $soxval for $in_file\n";
-    my @sox_args = ("sox","-v","$soxval",$in_file,$tmp_file);
-    system(@sox_args) == 0 or die "system @sox_args failed: $?";
-  }; warn $@ if $@;
+  if ($use_sox) {
+    eval { 
+      my $soxval = `sox $in_file -e stat -v 2>&1`;
+      chomp($soxval);
+      print "SOXVAL is $soxval for $in_file\n";
+      my @sox_args = ("sox","-v","$soxval",$in_file,$tmp_file);
+      system(@sox_args) == 0 or die "system @sox_args failed: $?";
+    }; warn $@ if $@;
+  }
   if ($make_flac) {
     my $flac_file = $out_file . ".flac";
     eval { 
@@ -293,15 +300,4 @@ sub encode_wav {
     }; warn $@ if $@;
   }
   unlink $tmp_file or warn "Can't unlink $tmp_file, $!";
-}
-
-sub get_tracks {
-  my $wav_file = shift;
-  my $min_silence_blocks = shift;
-  my $track_file = $wav_file . ".tracks";
-  my @track_data = read_file($track_file) or die "Can't open $track_file, $!";
-  my ($num_tracks) = grep {s/^Number_of_tracks=//} @track_data;
-  chomp $num_tracks;
-  print "NUM tracks is $num_tracks for min_silence_blocks=$min_silence_blocks\n";
-  return $num_tracks;
 }

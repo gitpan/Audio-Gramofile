@@ -4,7 +4,6 @@
 
 #include "ppport.h"
 #include "gramofile.h"
-#include "rfftw.h"
 
 MODULE = Audio::Gramofile		PACKAGE = Audio::Gramofile		
 

@@ -9,7 +9,7 @@ WriteMakefile(
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM => 'Gramofile.pm', # retrieve abstract from module
        AUTHOR     => 'Bob Wilkinson <bob@fourtheye.org>') : ()),
-    'LIBS'            => ['-L/usr/local/lib -lgramofile','-lrfftw -lfftw'], # e.g., '-lm'
+    'LIBS'            => ['-L/usr/local/lib -lgramofile -lfftw3'], # e.g., '-lm'
     'DEFINE'		=> '-DLIBRARY', # e.g., '-DHAVE_SOMETHING'
     'INC'		=> '-I.', # e.g., '-I. -I/usr/include/other'
 	# Un-comment this if you add C files to link with later:

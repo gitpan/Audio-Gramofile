@@ -9,7 +9,7 @@ T_int_array
 		$var = alloca(len * sizeof(int));
 		while (i < len) {
 			sv = av_fetch(av, i, 0);
-			if (sv && SvIOK(*sv)) {
+			if (sv && looks_like_number(*sv)) {
 				${var}[i] = SvIV(*sv);
 			}
 			else {

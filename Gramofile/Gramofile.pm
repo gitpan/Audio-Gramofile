@@ -1,6 +1,6 @@
 package Audio::Gramofile;
 
-use 5.005;
+use 5.006;
 use strict;
 
 use Carp;
@@ -11,7 +11,7 @@ use vars qw($VERSION @ISA);
 @ISA = qw(Exporter
 	DynaLoader);
 
-$VERSION = '0.02';
+$VERSION = '0.05';
 
 bootstrap Audio::Gramofile $VERSION;
 
@@ -399,19 +399,6 @@ This method filters the tracks with the previously specified (or default) parame
 
 e.g. $gramofile->filter_tracks;
 
-=head2 NOTE
-
-All methods whose names start with "init_" can be called with a hash (as documented) or by a list
-of integers, given in the order of the documented hash keys. Any unused values must be assigned to undef.
-
-e.g. $gramofile->init_cmf2_filter("rec_med_len" => 11, "fine_threshold" => 2500);
-
-could be invoked via
-
-$gramofile->init_cmf2_filter(undef, 11, undef, 2500, undef);
-
-(However, this shortcut isn't documented..., and may be removed)
-
 =head1 EXPORT
 
 None by default.
@@ -433,7 +420,7 @@ Bob Wilkinson, E<lt>bob@fourtheye.orgE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2003 by Bob Wilkinson
+Copyright 2003-2004 by Bob Wilkinson
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
@@ -469,54 +456,32 @@ sub set_output_file {
 sub _init {
   my $self = shift;
 
-  $self->init_tracksplit(1, 0, 4410, 150, 5, 20, 50, 3, 6);
-  $self->init_filter_tracks([ 5 ]);
-  $self->init_simple_median_filter(num_samples => 3);
-  $self->init_double_median_filter(5, 5);
-  $self->init_simple_mean_filter(3);
-  $self->init_rms_filter(3);
-  $self->init_cmf_filter(21, 9, 11, 5, 2500);
-  $self->init_cmf2_filter(9, 11, 12, 2000, 8500);
-  $self->init_cmf3_filter(9, 11, 12, 2000, 8500, 9);
-  $self->init_simple_normalize_filter(0);
+  $self->default_tracksplit;
+  $self->default_filter_tracks;
+  $self->default_simple_median_filter;
+  $self->default_double_median_filter;
+  $self->default_simple_mean_filter;
+  $self->default_rms_filter;
+  $self->default_cmf_filter;
+  $self->default_cmf2_filter;
+  $self->default_cmf3_filter;
+  $self->default_simple_normalize_filter;
 }
 
 sub init_tracksplit {
   my $self = shift;
 
-  my $make_use_rms;
-  my $make_graphs;
-  my $blocklen;
-  my $global_silence_factor;
-  my $local_silence_threshold;
-  my $min_silence_blocks;
-  my $min_track_blocks;
-  my $extra_blocks_start;
-  my $extra_blocks_end;
-
-  if (_first_numeric($_[0])) {
-    $make_use_rms = @_ ? shift : undef;
-    $make_graphs = @_ ? shift : undef;
-    $blocklen = @_ ? shift : undef;
-    $global_silence_factor = @_ ? shift : undef;
-    $local_silence_threshold = @_ ? shift : undef;
-    $min_silence_blocks = @_ ? shift : undef;
-    $min_track_blocks = @_ ? shift : undef;
-    $extra_blocks_start = @_ ? shift : undef;
-    $extra_blocks_end = @_ ? shift : undef;
-  } else {
-    my %hash = (@_);
-    $make_use_rms = delete $hash{make_use_rms};
-    $make_graphs = delete $hash{make_graphs};
-    $blocklen = delete $hash{blocklen};
-    $global_silence_factor = delete $hash{global_silence_factor};
-    $local_silence_threshold = delete $hash{local_silence_factor};
-    $min_silence_blocks = delete $hash{min_silence_factor};
-    $min_track_blocks = delete $hash{min_track_blocks};
-    $extra_blocks_start = delete $hash{extra_blocks_start};
-    $extra_blocks_end = delete $hash{extra_blocks_end};
-    croak "BAD ELEMENT in HASH" if %hash;
-  }
+  my %hash = (@_);
+  my $make_use_rms = delete $hash{make_use_rms};
+  my $make_graphs = delete $hash{make_graphs};
+  my $blocklen = delete $hash{blocklen};
+  my $global_silence_factor = delete $hash{global_silence_factor};
+  my $local_silence_threshold = delete $hash{local_silence_threshold};
+  my $min_silence_blocks = delete $hash{min_silence_blocks};
+  my $min_track_blocks = delete $hash{min_track_blocks};
+  my $extra_blocks_start = delete $hash{extra_blocks_start};
+  my $extra_blocks_end = delete $hash{extra_blocks_end};
+  croak "BAD ELEMENT in TRACKSPLIT HASH" if %hash;
 
   $self->{tracksplit}->{make_use_rms} = $make_use_rms if (defined $make_use_rms);
   $self->{tracksplit}->{make_graphs} = $make_graphs if (defined $make_graphs);
@@ -527,12 +492,24 @@ sub init_tracksplit {
   $self->{tracksplit}->{min_track_blocks} = $min_track_blocks if (defined $min_track_blocks);
   $self->{tracksplit}->{extra_blocks_start} = $extra_blocks_start if (defined $extra_blocks_start);
   $self->{tracksplit}->{extra_blocks_end} = $extra_blocks_end if (defined $extra_blocks_end);
-  1;
+}
+
+sub default_tracksplit {
+  shift->init_tracksplit(
+    make_use_rms => 1,
+    make_graphs => 0,
+    blocklen => 4410,
+    global_silence_factor => 150,
+    local_silence_threshold => 5,
+    min_silence_blocks => 20,
+    min_track_blocks => 50,
+    extra_blocks_start => 3,
+    extra_blocks_end => 6,
+  );
 }
 
 sub init_filter_tracks {
   my $self = shift;
-
   my $filter_ptr = @_ ? shift : undef;
   return unless (defined $filter_ptr);
 
@@ -550,7 +527,7 @@ sub init_filter_tracks {
       simple_normalize_filter => 10,
       experiment_filter       => 11,
     );
-    my @name_list = ($filter_ptr, @_);
+    my @name_list = ($filter_ptr, @_); # unshift the element we shifted to test
     my @num_list;
     foreach my $filter (@name_list) {
       croak "Invalid filter name, $filter, $!" unless (defined $filters_id{$filter});
@@ -561,108 +538,87 @@ sub init_filter_tracks {
 
   $self->{filter_num} = @$filter_ptr;
   $self->{filter_ptr} = $filter_ptr;
-  1;
+}
+
+sub default_filter_tracks {
+  shift->init_filter_tracks([ 5 ]);
 }
 
 sub init_simple_median_filter {
   my $self = shift;
 
-  my $num_samples;
-  if (_first_numeric($_[0])) {
-    $num_samples = @_ ? shift : undef;
-  } else {
-    my %hash = (@_);
-    $num_samples = delete $hash{num_samples};
-    croak "BAD ELEMENT in HASH" if %hash;
-  }
+  my %hash = (@_);
+  my $num_samples = delete $hash{num_samples};
+  croak "BAD ELEMENT in INIT_SIMPLE_MEDIAN_FILTER HASH" if %hash;
 
   _odd_error_check("simple_median_num_samples", $num_samples);
   $self->{simple_median}->{num_samples} = $num_samples if (defined $num_samples);
-  1;
+}
+
+sub default_simple_median_filter {
+  shift->init_simple_median_filter(num_samples => 3);
 }
 
 sub init_double_median_filter {
   my $self = shift;
-
-  my $first_num_samples;
-  my $second_num_samples;
-  if (_first_numeric($_[0])) {
-    $first_num_samples = @_ ? shift : undef;
-    $second_num_samples = @_ ? shift : undef;
-  } else {
-    my %hash = (@_);
-    $first_num_samples = delete $hash{first_num_samples};
-    $second_num_samples = delete $hash{second_num_samples};
-    croak "BAD ELEMENT in HASH" if %hash;
-  }
+  my %hash = (@_);
+  my $first_num_samples = delete $hash{first_num_samples};
+  my $second_num_samples = delete $hash{second_num_samples};
+  croak "BAD ELEMENT in INIT_DOUBLE_MEDIAN_FILTER HASH" if %hash;
 
   _odd_error_check("double_median_first_num_samples", $first_num_samples);
   _odd_error_check("double_median_second_num_samples", $second_num_samples);
 
   $self->{double_median}->{first_num_samples} = $first_num_samples if (defined $first_num_samples);
   $self->{double_median}->{second_num_samples} = $second_num_samples if (defined $second_num_samples);
-  1;
+}
+
+sub default_double_median_filter {
+  shift->init_double_median_filter(
+    first_num_samples => 5,
+    second_num_samples => 5,
+  );
 }
 
 sub init_simple_mean_filter {
   my $self = shift;
-
-  my $num_samples;
-  if (_first_numeric($_[0])) {
-    $num_samples = @_ ? shift : undef;
-  } else {
-    my %hash = (@_);
-    $num_samples = delete $hash{num_samples};
-    croak "BAD ELEMENT in HASH" if %hash;
-  }
+  my %hash = (@_);
+  my $num_samples = delete $hash{num_samples};
+  croak "BAD ELEMENT in INIT_SIMPLE_MEAN_FILTER HASH" if %hash;
 
   _odd_error_check("simple_mean_num_samples", $num_samples);
 
   $self->{simple_mean}->{num_samples} = $num_samples if (defined $num_samples);
-  1;
+}
+
+sub default_simple_mean_filter {
+  shift->init_simple_mean_filter(num_samples => 3);
 }
 
 sub init_rms_filter {
   my $self = shift;
-
-  my $num_samples;
-  if (_first_numeric($_[0])) {
-    $num_samples = @_ ? shift : undef;
-  } else {
-    my %hash = (@_);
-    $num_samples = delete $hash{num_samples};
-    croak "BAD ELEMENT in HASH" if %hash;
-  }
+  my %hash = (@_);
+  my $num_samples = delete $hash{num_samples};
+  croak "BAD ELEMENT in INIT_RMS_FILTER HASH" if %hash;
 
   _odd_error_check("rms_filter_num_samples", $num_samples);
 
   $self->{rms}->{num_samples} = $num_samples if (defined $num_samples);
-  1;
+}
+
+sub default_rms_filter {
+  shift->init_rms_filter(num_samples => 3);
 }
 
 sub init_cmf_filter {
   my $self = shift;
-
-  my $num_samples;
-  my $rms_length;
-  my $rec_med_len;
-  my $rec_med_dec;
-  my $tick_threshold;
-  if (_first_numeric($_[0])) {
-    $num_samples = @_ ? shift : undef;
-    $rms_length = @_ ? shift : undef;
-    $rec_med_len = @_ ? shift : undef;
-    $rec_med_dec = @_ ? shift : undef;
-    $tick_threshold = @_ ? shift : undef;
-  } else {
-    my %hash = (@_);
-    $num_samples = delete $hash{num_samples};
-    $rms_length = delete $hash{rms_length};
-    $rec_med_len = delete $hash{rec_med_len};
-    $rec_med_dec = delete $hash{rec_med_dec};
-    $tick_threshold = delete $hash{tick_threshold};
-    croak "BAD ELEMENT in HASH" if %hash;
-  }
+  my %hash = (@_);
+  my $num_samples = delete $hash{num_samples};
+  my $rms_length = delete $hash{rms_length};
+  my $rec_med_len = delete $hash{rec_med_len};
+  my $rec_med_dec = delete $hash{rec_med_dec};
+  my $tick_threshold = delete $hash{tick_threshold};
+  croak "BAD ELEMENT in INIT_CMF_FILTER HASH" if %hash;
 
   _odd_error_check("cmf_median_tick_num_samples", $num_samples);
   _odd_error_check("cmf_rms_length", $rms_length);
@@ -675,31 +631,27 @@ sub init_cmf_filter {
   $self->{cmf}->{rec_med_len} = $rec_med_len if (defined $rec_med_len);
   $self->{cmf}->{rec_med_dec} = $rec_med_dec if (defined $rec_med_dec);
   $self->{cmf}->{tick_threshold} = $tick_threshold if (defined $tick_threshold);
-  1;
+}
+
+sub default_cmf_filter {
+  shift->init_cmf_filter(
+    num_samples => 21,
+    rms_length => 9,
+    rec_med_len => 11,
+    rec_med_dec => 5,
+    tick_threshold => 2500,
+  );
 }
 
 sub init_cmf2_filter {
   my $self = shift;
-  my $rms_length;
-  my $rec_med_len;
-  my $rec_med_dec;
-  my $fine_threshold;
-  my $tick_threshold;
-  if (_first_numeric($_[0])) {
-    $rms_length = @_ ? shift : undef;
-    $rec_med_len = @_ ? shift : undef;
-    $rec_med_dec = @_ ? shift : undef;
-    $fine_threshold = @_ ? shift : undef;
-    $tick_threshold = @_ ? shift : undef;
-  } else {
-    my %hash = (@_);
-    $rms_length = delete $hash{rms_length};
-    $rec_med_len = delete $hash{rec_med_len};
-    $rec_med_dec = delete $hash{rec_med_dec};
-    $fine_threshold = delete $hash{fine_threshold};
-    $tick_threshold = delete $hash{tick_threshold};
-    croak "BAD ELEMENT in HASH" if %hash;
-  }
+  my %hash = (@_);
+  my $rms_length = delete $hash{rms_length};
+  my $rec_med_len = delete $hash{rec_med_len};
+  my $rec_med_dec = delete $hash{rec_med_dec};
+  my $fine_threshold = delete $hash{fine_threshold};
+  my $tick_threshold = delete $hash{tick_threshold};
+  croak "BAD ELEMENT in INIT_CMF2_FILTER HASH" if %hash;
 
   _odd_error_check("cmf2_rms_length", $rms_length);
   _odd_error_check("cmf2_recursive_median_length", $rec_med_len);
@@ -712,34 +664,28 @@ sub init_cmf2_filter {
   $self->{cmf2}->{rec_med_dec} = $rec_med_dec if (defined $rec_med_dec);
   $self->{cmf2}->{fine_threshold} = $fine_threshold if (defined $fine_threshold);
   $self->{cmf2}->{tick_threshold} = $tick_threshold if (defined $tick_threshold);
-  1;
+}
+
+sub default_cmf2_filter {
+  shift->init_cmf2_filter(
+    rms_length => 9,
+    rec_med_len => 11,
+    rec_med_dec => 12,
+    fine_threshold => 2000,
+    tick_threshold => 8500,
+  );
 }
 
 sub init_cmf3_filter {
   my $self = shift;
-  my $rms_length;
-  my $rec_med_len;
-  my $rec_med_dec;
-  my $fine_threshold;
-  my $tick_threshold;
-  my $fft_length;
-  if (_first_numeric($_[0])) {
-    $rms_length = @_ ? shift : undef;
-    $rec_med_len = @_ ? shift : undef;
-    $rec_med_dec = @_ ? shift : undef;
-    $fine_threshold = @_ ? shift : undef;
-    $tick_threshold = @_ ? shift : undef;
-    $fft_length = @_ ? shift : undef;
-  } else {
-    my %hash = (@_);
-    $rms_length = delete $hash{rms_length};
-    $rec_med_len = delete $hash{rec_med_len};
-    $rec_med_dec = delete $hash{rec_med_dec};
-    $fine_threshold = delete $hash{fine_threshold};
-    $tick_threshold = delete $hash{tick_threshold};
-    $fft_length = delete $hash{fft_length};
-    croak "BAD ELEMENT in HASH" if %hash;
-  }
+  my %hash = (@_);
+  my $rms_length = delete $hash{rms_length};
+  my $rec_med_len = delete $hash{rec_med_len};
+  my $rec_med_dec = delete $hash{rec_med_dec};
+  my $fine_threshold = delete $hash{fine_threshold};
+  my $tick_threshold = delete $hash{tick_threshold};
+  my $fft_length = delete $hash{fft_length};
+  croak "BAD ELEMENT in INIT_CMF3_FILTER HASH" if %hash;
 
   _odd_error_check("cmf3_rms_length", $rms_length);
   _odd_error_check("cmf3_recursive_median_length", $rec_med_len);
@@ -754,24 +700,31 @@ sub init_cmf3_filter {
   $self->{cmf3}->{fine_threshold} = $fine_threshold if (defined $fine_threshold);
   $self->{cmf3}->{tick_threshold} = $tick_threshold if (defined $tick_threshold);
   $self->{cmf3}->{fft_length} = $fft_length if (defined $fft_length);
-  1;
+}
+
+sub default_cmf3_filter {
+  shift->init_cmf3_filter(
+    rms_length => 9,
+    rec_med_len => 11,
+    rec_med_dec => 12,
+    fine_threshold => 2000,
+    tick_threshold => 8500,
+    fft_length => 9,
+  );
 }
 
 sub init_simple_normalize_filter {
   my $self = shift;
-
-  my $normalize_factor;
-  if (_first_numeric($_[0])) {
-    $normalize_factor = @_ ? shift : undef;
-  } else {
-    my %hash = (@_);
-    $normalize_factor = delete $hash{normalize_factor};
-    croak "BAD ELEMENT in HASH" if %hash;
-  }
+  my %hash = (@_);
+  my $normalize_factor = delete $hash{normalize_factor};
+  croak "BAD ELEMENT in INIT_SIMPLE_NORMALIZE_FILTER HASH" if %hash;
 
   _error_check("simple_normalize_factor", $normalize_factor, -1, 101);
   $self->{simple_normalize}->{normalize_factor} = $normalize_factor if (defined $normalize_factor);
-  1;
+}
+
+sub default_simple_normalize_filter {
+  shift->init_simple_normalize_filter(normalize_factor => 0);
 }
 
 sub split_to_tracks {
@@ -803,7 +756,7 @@ sub filter_tracks {
                                         $self->{double_median}->{second_num_samples} ];
   my $simple_mean_num_samples = $self->{simple_mean}->{num_samples};
   my $rms_filter_num_samples = $self->{rms}->{num_samples};
-  my $cmf_init_params_ptr = [ $self->{cmf}->{first_num_samples},
+  my $cmf_init_params_ptr = [ $self->{cmf}->{num_samples},
                               $self->{cmf}->{rms_length},
                               $self->{cmf}->{rec_med_len},
                               $self->{cmf}->{rec_med_dec},
@@ -833,12 +786,6 @@ sub filter_tracks {
                                   $cmf2_init_params_ptr,
                                   $cmf3_init_params_ptr,
                                   $simple_normalize_factor);
-}
-
-sub _first_numeric {
-  my $param = shift;
-  return 1 unless (defined $param); # permits lists to have undef first element
-  return $param =~ /^\d+$/;
 }
 
 sub _odd_error_check {

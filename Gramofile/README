@@ -1,4 +1,4 @@
-Audio/Gramofile version 0.01
+Audio/Gramofile version 0.05
 ============================
 
 This module provides a Perl interface to Gramofile, a program for recording
@@ -10,8 +10,8 @@ Gramofile was written by Anne Bezemer and Ton Le.
 
 Gramofile is available from http://panic.et.tudelft.nl/~costar/gramofile/
 
-A dynamically linked library, libgramofile, derived from Gramofile, used
-by this module is available from http://sourceforge.net/projects/libgramofile
+A library, libgramofile, derived from Gramofile, used by this module is 
+available from http://sourceforge.net/projects/libgramofile
 
 The advantage of using a Perl interface, rather than the curses interface, is
 that batch processing of large number of files is easier. Just put all the 
@@ -33,7 +33,7 @@ To install this module type the following:
 
 DEPENDENCIES
 
-Depends on libgramofile, a dynamically-linked library available from 
+Depends on libgramofile, a library available from 
 http://sourceforge.net/projects/libgramofile
 
 CREDITS
@@ -48,7 +48,7 @@ the module, by splitting a wav file, and then processing the resultant files.
 
 COPYRIGHT AND LICENCE
 
-This module is : Copyright (C) 2003 Bob Wilkinson
+This module is : Copyright (C) 2003-2004 Bob Wilkinson
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
