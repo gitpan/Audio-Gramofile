@@ -5,13 +5,16 @@ use strict;
 
 use Carp;
 
+use constant SECONDS_PER_HOUR => 3600;
+use constant SECONDS_PER_MINUTE => 60;
+
 require Exporter;
 require DynaLoader;
 use vars qw($VERSION @ISA);
 @ISA = qw(Exporter
 	DynaLoader);
 
-$VERSION = '0.05';
+$VERSION = '0.06';
 
 bootstrap Audio::Gramofile $VERSION;
 
@@ -57,6 +60,12 @@ $gramofile->init_cmf3_filter("fft_length" => 8);
 
 $gramofile->init_simple_normalize_filter("normalize_factor" => 25);
 
+$gramofile->use_begin_end_time($begin_time, $end_time);
+
+$gramofile->process_whole_file;
+
+$gramofile->adjust_frames($framesize);
+
 $gramofile->filter_tracks;
 
 =head1 ABSTRACT
@@ -68,7 +77,7 @@ recordings.
 
 Gramofile was written by Anne Bezemer and Ton Le.
 
-Gramofile is available from http://panic.et.tudelft.nl/~costar/gramofile/
+Gramofile is available from http://www.opensourcepartners.nl/~costar/gramofile/
 
 libgramofile - a library derived from Gramofile is
 available from http://sourceforge.net/projects/libgramofile
@@ -393,6 +402,27 @@ normalize_factor # the normalization factor.
 
 e.g. $gramofile->init_simple_normalize_filter("normalize_factor" => 50);
 
+=head2 use_begin_end_time
+
+A begin time and end time can be specified. These times will be used instead of
+the track times derived from the split_to_tracks method.
+
+e.g. $gramofile->use_begin_end_time($begin_time, $end_time);
+
+=head2 process_whole_file
+
+The whole file can be passed through the signal processing routines if this method
+is used.
+
+e.g. $gramofile->process_whole_file;
+
+=head2 adjust_frames
+
+The default frame size is 588 (1/75 sec. @ 44.1 khz). This method allows this value
+to be user-defined.
+
+e.g. $gramofile->adjust_frames($framesize);
+
 =head2 filter_tracks
 
 This method filters the tracks with the previously specified (or default) parameters.
@@ -405,7 +435,7 @@ None by default.
 
 =head1 SEE ALSO
 
-Gramofile : available from http://panic.et.tudelft.nl/~costar/gramofile/
+Gramofile : available from http://www.opensourcepartners.nl/~costar/gramofile/
 
 libgramofile : A dynamically linked library derived from Gramofile, which this
 module needs, available from http://sourceforge.net/projects/libgramofile
@@ -420,7 +450,7 @@ Bob Wilkinson, E<lt>bob@fourtheye.orgE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2003-2004 by Bob Wilkinson
+Copyright 2003-2005 by Bob Wilkinson
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
@@ -466,6 +496,7 @@ sub _init {
   $self->default_cmf2_filter;
   $self->default_cmf3_filter;
   $self->default_simple_normalize_filter;
+  $self->{usetracktimes} = 1;
 }
 
 sub init_tracksplit {
@@ -744,6 +775,32 @@ sub split_to_tracks {
                                     $self->{tracksplit}->{extra_blocks_end})
 }
 
+sub use_begin_end_time {
+  my $self = shift;
+  my $begin_time = shift;
+  my $end_time = shift;
+
+  $self->{begin_time} = _to_seconds($begin_time);
+  $self->{end_time} = _to_seconds($end_time);
+  $self->{usebeginendtime} = 1;
+  $self->{usetracktimes} = 0;
+}
+
+sub process_whole_file {
+  my $self = shift;
+
+  $self->{usebeginendtime} = 0;
+  $self->{usetracktimes} = 0;
+}
+
+sub adjust_frames {
+  my $self = shift;
+  my $framesize = shift;
+
+  $self->{adjustframes} = 1;
+  $self->{framesize} = $framesize;
+}
+
 sub filter_tracks {
   my $self = shift;
 
@@ -774,6 +831,13 @@ sub filter_tracks {
 			       $self->{cmf3}->{fft_length} ];
   my $simple_normalize_factor = $self->{simple_normalize}->{normalize_factor};
 
+  my $usebeginendtime = (defined $self->{usebeginendtime}) ? $self->{usebeginendtime} : 0;
+  my $usetracktimes = (defined $self->{usetracktimes}) ? $self->{usetracktimes} : 0;
+  my $begintime = (defined $self->{begin_time}) ? $self->{begin_time} : 0.0;
+  my $endtime = (defined $self->{end_time}) ? $self->{end_time} : 0.0;
+  my $adjustframes = (defined $self->{adjustframes}) ? $self->{adjustframes} : 0;
+  my $framesize = (defined $self->{framesize}) ? $self->{framesize} : 588;
+
   Audio::Gramofile::signproc_main($self->{input_file},
                                   $self->{output_file},
                                   $self->{filter_num},
@@ -785,7 +849,13 @@ sub filter_tracks {
                                   $cmf_init_params_ptr,
                                   $cmf2_init_params_ptr,
                                   $cmf3_init_params_ptr,
-                                  $simple_normalize_factor);
+                                  $simple_normalize_factor,
+				  $usebeginendtime,
+				  $usetracktimes,
+				  $begintime,
+				  $endtime,
+				  $adjustframes,
+				  $framesize);
 }
 
 sub _odd_error_check {
@@ -808,6 +878,24 @@ sub _error_check {
   if (defined $max) {
     croak "Param $name (value is $value) needs to be less than $max" unless ($value < $max);
   }
+}
+
+sub _to_seconds {
+  my $time_string = shift;
+
+# converts hh:mm:ss.sss, or mm:ss.sss to seconds
+
+  $time_string =~ s/^://;
+  my $colons = $time_string =~ tr/:/:/;
+
+  if ($colons == 2) {
+    my ($hours, $minutes, $seconds) = split(/:/, $time_string);
+    return SECONDS_PER_HOUR*$hours + SECONDS_PER_MINUTE*$minutes + $seconds;
+  } elsif ($colons == 1) {
+    my ($minutes, $seconds) = split(/:/, $time_string);
+    return SECONDS_PER_MINUTE*$minutes + $seconds;
+  }
+  return $time_string;
 }
 
 1;

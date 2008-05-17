@@ -6,4 +6,6 @@ MANIFEST
 ppport.h
 gramofile.h
 README
+typemap
 t/1.t
+examples/process_wav.pl

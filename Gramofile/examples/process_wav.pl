@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# $Id: process_wav.pl,v 1.6 2004/05/17 22:21:39 bob9960 Exp $
+# $Id: process_wav.pl,v 1.8 2007/11/11 21:28:09 bob9960 Exp $
 #
 
 =pod
@@ -12,7 +12,7 @@
 This script demonstrates use of the XS interface to 
 libgramofile (available from http://sourceforge.net/projects/libgramofile)
 which is derived from J. A. Bezemer's Gramofile program (available from 
-http://panic.et.tudelft.nl/~costar/gramofile/). 
+http://www.opensourcepartners.nl/~costar/gramofile/). 
 
 Gramofile can be used to convert large wav files generated 
 from e.g. vinyl LPs into a number of constituent wav files 
@@ -107,6 +107,10 @@ my $cmf3_tick_fine_threshold;
 my $cmf3_tick_detection_threshold;
 my $cmf3_fft_length;
 my $simple_normalize_factor;
+my $begin_time;
+my $end_time;
+my $process_whole_file;
+my $framesize;
 
 my @filter_list;
 my $getopt_result = GetOptions (
@@ -142,12 +146,16 @@ my $getopt_result = GetOptions (
   'cmf3_tick_detection_threshold=i' => \$cmf3_tick_detection_threshold,
   'cmf3_fft_length=i' => \$cmf3_fft_length,
   'simple_normalize_factor=i' => \$simple_normalize_factor,
-  'use_tracksplit=i' => \$use_tracksplit,
-  'use_signproc=i' => \$use_signproc,
-  'use_sox=i' => \$use_sox,
-  'make_flac=i' => \$make_flac,
-  'make_mp3=i' => \$make_mp3,
-  'make_ogg=i' => \$make_ogg,
+  'begin_time=s' => \$begin_time,
+  'end_time=s' => \$end_time,
+  'process_whole_file' => \$process_whole_file,
+  'frame_size=i' => \$framesize,
+  'use_tracksplit' => \$use_tracksplit,
+  'use_signproc' => \$use_signproc,
+  'use_sox' => \$use_sox,
+  'make_flac' => \$make_flac,
+  'make_mp3' => \$make_mp3,
+  'make_ogg' => \$make_ogg,
   'infile_regexp=s' => \$infile_regexp,
   'outfile_prefix=s' => \$outfile_prefix,
   'root_regexp=s' => \$root_regexp,
@@ -156,6 +164,10 @@ my $getopt_result = GetOptions (
 die "Bad Parameter passed to $0" unless ($getopt_result);
 
 die "process_wav wav_dir output_dir [tmp_dir]" unless (($#ARGV == 1) or ($#ARGV == 2));
+die "Need both begin and end time to be specified" 
+  if ((defined $begin_time and not defined $end_time) or (not defined $begin_time and defined $end_time));
+die "Can't specify begin and end time and process_whole_file" 
+  if (defined $process_whole_file and defined $begin_time and defined $end_time);
 
 my $wav_dir = shift @ARGV;
 my $output_dir = shift @ARGV;
@@ -233,6 +245,11 @@ $gramofile->init_cmf3_filter("fft_length" => $cmf3_fft_length)
 
 $gramofile->init_simple_normalize_filter("normalize_factor" => $simple_normalize_factor) 
   if (defined $simple_normalize_factor);
+
+$gramofile->use_begin_end_time($begin_time, $end_time) if (defined $begin_time and defined $end_time);
+$gramofile->process_whole_file if (defined $process_whole_file);
+$gramofile->adjust_frames($framesize) if (defined $framesize);
+
 $gramofile->init_filter_tracks(@filter_list);
 
 opendir(WAVDIR, $wav_dir) || die "can't opendir $wav_dir: $!";

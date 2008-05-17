@@ -21,7 +21,7 @@
  * Following in the footsteps of Anne Bezemer and Ton Le
  * who wrote Gramofile
  *
- * http://panic.et.tudelft.nl/~costar/gramofile/
+ * http://www.opensourcepartners.nl/~costar/gramofile/
  * 
  */
                                                                                                                 
@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 
-void signproc_main (char *infilename, char *outfilename, int number_of_filters, int *filter_type, int simple_median_num_samples, int *double_median_init_params, int simple_mean_num_samples, int rms_filter_num_samples, int *cmf_init_params, int *cmf2_init_params, int *cmf3_init_params, int simple_nor_factor);
+void signproc_main (char *infilename, char *outfilename, int number_of_filters, int *filter_type, int simple_median_num_samples, int *double_median_init_params, int simple_mean_num_samples, int rms_filter_num_samples, int *cmf_init_params, int *cmf2_init_params, int *cmf3_init_params, int simple_nor_factor, int usebeginendtime, int usetracktimes, double begintime, double endtime, int adjustframes, long framesize);
 
 void tracksplit_main (char *filename, int make_use_rms, int make_graphs, long blocklen, int global_silence_factor, int local_silence_threshold, int min_silence_blocks, int min_track_blocks, int extra_blocks_start, int extra_blocks_end);
 
