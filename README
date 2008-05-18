@@ -1,4 +1,4 @@
-Audio/Gramofile version 0.06
+Audio/Gramofile version 0.08
 ============================
 
 This module provides a Perl interface to Gramofile, a program for recording
@@ -48,7 +48,7 @@ the module, by splitting a wav file, and then processing the resultant files.
 
 COPYRIGHT AND LICENCE
 
-This module is : Copyright (C) 2003-2005 Bob Wilkinson
+This module is : Copyright (C) 2003-2008 Bob Wilkinson
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 

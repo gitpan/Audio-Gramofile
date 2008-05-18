@@ -1,5 +1,11 @@
 Revision history for Perl extension Audio::Gramofile.
 
+0.08  Tue Feb  5 18:08:00 2008
+        - brought versions up to date
+
+0.07  Tue Feb  5 18:02:00 2008
+        - updated url of original Gramofile project
+
 0.06  Tue Jun 14 21:32:00 2005
         - implement begin/end times and framesize adjustment
 

@@ -14,7 +14,7 @@ use vars qw($VERSION @ISA);
 @ISA = qw(Exporter
 	DynaLoader);
 
-$VERSION = '0.06';
+$VERSION = '0.08';
 
 bootstrap Audio::Gramofile $VERSION;
 
